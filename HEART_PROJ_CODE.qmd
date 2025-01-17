@@ -1,0 +1,395 @@
+---
+title: "FINAL HEART PROJ"
+format: html
+editor: visual
+---
+
+## Libraries
+
+```{r, include = FALSE}
+library(ggplot2)
+library(dplyr)
+library(MASS)
+library(reshape2)
+library(car)
+library(GGally)
+library(patchwork)
+library(pROC)
+library(caret)
+library(gridExtra)
+library(corrplot)
+```
+
+## Loading in Data
+
+```{r}
+heart_1 <- read.csv("heart_disease_uci.csv", header = TRUE)
+
+heart_i <- heart_1 %>%
+  rename(
+    type_chest_pain = cp,
+    resting_bp = trestbps,
+    fasting_bloodsugar = fbs,
+    max_hr = thalch, 
+    heart_disease_stage = num,
+    recovery_impairment = oldpeak
+  )
+
+heart <- heart_i
+heart$dataset <- NULL
+
+# CLEANING CARTEGORICAL VARIABLES:
+heart$heart_disease_binary <- ifelse(heart$heart_disease_stage %in% c(0, 1), 0, 1)
+heart$lvh <- ifelse(heart$restecg == 'lv hypertrophy', 1, 0)
+heart$male <- ifelse(heart$sex == "Male", 1, 0)
+heart$exercise_chest_pain <- ifelse(heart$exang == "TRUE", 1, 0)
+heart$thalassemia_rdefect <- ifelse(heart$thal == "reversable defect", 1, 0)
+heart$thalassemia_fdefect <- ifelse(heart$thal == "fixed defect", 1, 0)
+
+```
+
+```{r}
+summary(heart)
+```
+
+## EDA's
+
+```{r}
+# Define the plots with customized themes
+p1 <- ggplot(heart, aes(x = as.factor(heart_disease_stage), y = recovery_impairment)) +
+  geom_violin(fill = "#1f77b4", color = "black", alpha = 0.7) +
+  labs(x = "Heart Disease Stage", y = "Recovery Impairment (All Ages)") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid = element_blank(), # Removes gridlines for a cleaner look
+    legend.position = "none"
+  ) +
+  coord_flip()
+
+p2 <- ggplot(heart[heart$age >= 28 & heart$age <= 47,], aes(x = as.factor(heart_disease_stage), y = recovery_impairment)) +
+  geom_violin(fill = "#ff7f0e", color = "black", alpha = 0.7) +
+  labs(x = "Heart Disease Stage", y = "Recovery Impairment (Ages 28-47)") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  ) +
+  coord_flip()
+
+p3 <- ggplot(heart[heart$age >= 48 & heart$age <= 60,], aes(x = as.factor(heart_disease_stage), y = recovery_impairment)) +
+  geom_violin(fill = "#2ca02c", color = "black", alpha = 0.7) +
+  labs(x = "Heart Disease Stage", y = "Recovery Impairment (Ages 48-60)") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  ) +
+  coord_flip()
+
+p4 <- ggplot(heart[heart$age >= 61 & heart$age <= 77,], aes(x = as.factor(heart_disease_stage), y = recovery_impairment)) +
+  geom_violin(fill = "#d62728", color = "black", alpha = 0.7) +
+  labs(x = "Heart Disease Stage", y = "Recovery Impairment (Ages 61-77)") +
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.title = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold"),
+    panel.grid = element_blank(),
+    legend.position = "none"
+  ) +
+  coord_flip()
+
+# Combine all the plots with proper arrangement and title
+(p1 + p2) / (p3 + p4) +
+  plot_annotation(
+    title = "Recovery Impairment by Heart Disease Stage and Age Group",
+    theme = theme(
+      plot.title = element_text(hjust = 0.5, size = 18, face = "bold") # Center and bold the title
+    )
+  )
+
+
+
+# differences between men and women:
+ggplot(heart, aes(x = age, y = heart_disease_stage, color = as.factor(sex))) +
+  geom_jitter(alpha = 0.5) +
+  labs(
+    x = "Age", 
+    y = "Heart Disease Stage", 
+    title = "Interaction of Age and Gender on Heart Disease Stage",
+    color = "Gender"  # Specify the legend title
+  ) +
+  theme_minimal() +
+  facet_wrap(~ sex)
+
+#----------------------------------------------
+# Select only numeric columns
+numeric_heart <- heart[sapply(heart, is.numeric)]
+
+# Remove columns 7 and 10 (by index)
+numeric_heart <- numeric_heart[, -c(4, 6, 8, 9, 10)]
+numeric_heart
+
+# Compute the correlation matrix, ignoring NA values pairwise
+corr_matrix <- cor(numeric_heart, use = "pairwise.complete.obs")
+corrplot(corr_matrix,type = "lower")
+
+```
+
+## Variable Selection
+
+The "someofheart" data set is a temporary data set that removes all of the categorical (non-binary) column that we did not want to include in our ultimate model. We had to do this because we were getting many errors trying to run bestglm() on the full data set.
+
+```{r}
+someofheart <- heart[, -c(2, 3, 4, 8, 12, 14, 15, 16)]  # Removes the 3rd column
+heart_best_subsets_aic <- bestglm(someofheart,
+                                  IC = "AIC",
+                                  method = "exhaustive",
+                                  TopModels = 1,
+                                  family = binomial)
+summary(heart_best_subsets_aic$BestModel)
+```
+
+## Simple Model
+
+Model using simple predictors for heart disease, and the odds ratio graph to quantify effect.
+
+```{r}
+# fit simple linear model:
+lm_simple <- glm(heart_disease_binary ~ max_hr + age + male + resting_bp, data = heart, family = binomial)
+summary(lm_simple)
+
+# coefficients and their confidence intervals
+coefs <- summary(lm_simple)$coefficients
+odds_ratios <- exp(coefs[, 1]) 
+conf_int <- exp(confint(lm_simple))  # Confidence intervals for odds ratios
+
+coef_df <- data.frame(
+  variable = rownames(coefs),
+  odds_ratio = odds_ratios,
+  lower = conf_int[, 1],
+  upper = conf_int[, 2]
+)
+
+# Plot the odds ratios with confidence intervals
+ggplot(coef_df, aes(x = reorder(variable, odds_ratio), y = odds_ratio)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = lower, ymax = upper)) +
+  coord_flip() +
+  labs(title = "Heart Disease 95% Confidence Intervals Based on Simple Indicators",
+       x = "Predictor Variable",
+       y = "Odds Ratio") +
+  theme_minimal()
+```
+
+### Assumptions of Simple Model
+
+```{r}
+l1 <- scatter.smooth(x = heart$max_hr, y = as.numeric(heart$heart_disease_binary) - 1)
+l2 <- scatter.smooth(x = heart$age, y = as.numeric(heart$heart_disease_binary) - 1)
+l3 <- scatter.smooth(x = heart$male, y = as.numeric(heart$heart_disease_binary) - 1)
+l4 <- scatter.smooth(x = heart$resting_bp, y = as.numeric(heart$heart_disease_binary) - 1)
+l5 <- plot(lm_simple, which = 5, cook.levels = .5)
+
+vif(lm_simple)
+
+# this code uses the real R-Squared (and is valid since we are looking at how
+# the predictor variables relate, and we are not using the response)
+max(vif(lm_simple))# < 10
+mean(vif(lm_simple)) # < 5
+```
+
+# Medical Model
+
+Model using medical predictors of heart disease with similar odds ratio graph.
+
+```{r}
+lm_medical <- glm(heart_disease_binary ~ exercise_chest_pain + lvh + chol +
+                  thalassemia_rdefect + thalassemia_fdefect + recovery_impairment, 
+                  data = heart, family = binomial)
+summary(lm_medical)
+
+#confidence intervals of the odds ratios:
+coefs_m <- summary(lm_medical)$coefficients
+odds_ratios_m <- exp(coefs_m[, 1])
+conf_int_m <- exp(confint(lm_medical))  
+
+coef_df_m <- data.frame(
+  variable = rownames(coefs_m),
+  odds_ratio = odds_ratios_m,
+  lower = conf_int_m[, 1],
+  upper = conf_int_m[, 2]
+)
+#remove the intercept
+coef_df_m <- coef_df_m[coef_df_m$variable != "(Intercept)", ]
+
+ggplot(coef_df_m, aes(x = reorder(variable, odds_ratio), y = odds_ratio)) +
+  geom_point() +  # Point for the odds ratio
+  geom_errorbar(aes(ymin = lower, ymax = upper)) +  # Error bars for the CI
+  coord_flip() +  # Flip the axes for better readability
+  labs(
+    title = "Heart Disease 95% Confidence Intervals Based on Medical Info",
+    x = "Predictor Variable",
+    y = "Odds Ratio") + theme_minimal()
+```
+
+### Assumptions of Medical Model
+
+```{r}
+scatter.smooth(x = heart$exercise_chest_pain, y = as.numeric(heart$heart_disease_binary) - 1)
+scatter.smooth(x = heart$unhealthy, y = as.numeric(heart$heart_disease_binary) - 1)
+scatter.smooth(x = heart$chol, y = as.numeric(heart$heart_disease_binary) - 1)
+scatter.smooth(x = heart$thalassemia_rdefect, y = as.numeric(heart$heart_disease_binary) - 1)
+scatter.smooth(x = heart$thalassemia_fdefect, y = as.numeric(heart$heart_disease_binary) - 1)
+
+plot(lm_medical, which = 5, cook.levels = .5)
+
+vif(lm_medical)
+
+# this code uses the real R-Squared (and is valid since we are looking at how
+# the predictor variables relate, and we are not using the response)
+max(vif(lm_medical))# < 10
+mean(vif(lm_medical)) # < 5
+```
+
+## Testing predictions
+
+### with the simple model:
+
+```{r}
+set.seed(123)
+trainIndex <- createDataPartition(heart$heart_disease_binary, p = 0.8, list = FALSE)
+
+trainData <- heart[trainIndex, ]
+testData <- heart[-trainIndex, ]
+
+dim(trainData)  # Should be 80% of original data
+dim(testData)   # Should be 20% of original data
+
+predictions_simple <- predict(lm_simple, newdata = testData, type = "response")
+predicted_class_sim <- ifelse(predictions_simple > 0.5, 1, 0)  # use 0.5 as cutoff value
+
+#CONFUSION MATRIX:
+confusionMatrix(factor(predicted_class_sim), factor(testData$heart_disease_binary))
+
+# Calculate ROC curve and AUC
+roc_curve <- roc(testData$heart_disease_binary, predictions_simple)
+plot(roc_curve, main = "Simple Model (AUC = 0.7491)")
+auc(roc_curve)
+```
+
+### with the medical model:
+
+```{r}
+predictions_medical <- predict(lm_medical, newdata = testData, type = "response")
+predicted_class_medical <- ifelse(predictions_medical > 0.5, 1, 0)  # again using 0.5 as the cutoff value
+
+#CONFUSION MATRIX:
+confusionMatrix(factor(predicted_class_medical), factor(testData$heart_disease_binary))
+
+# Calculate ROC curve and AUC
+roc_curve_med <- roc(testData$heart_disease_binary, predictions_medical)
+plot(roc_curve_med, main = "Medical Model (AUC = 0.814)")
+auc(roc_curve_med)
+```
+
+### OPTEMIZING the cutoff values
+
+medical model optimization
+
+```{r}
+cutoffs <- seq(0, 1, by = 0.01)
+
+# Initialize a data frame
+performance_metrics <- data.frame(cutoff = numeric(0), 
+                                  sensitivity = numeric(0), 
+                                  specificity = numeric(0),
+                                  accuracy = numeric(0),
+                                  precision = numeric(0))
+
+# Loop through each cutoff to calculate metrics
+for (threshold in cutoffs) {
+  # Convert predicted probabilities to class labels using the current cutoff
+  predicted_class <- ifelse(predictions_medical > threshold, 1, 0)
+  
+  # Confusion Matrix
+  cm <- confusionMatrix(factor(predicted_class), factor(testData$heart_disease_binary))
+  
+  # Extract performance metrics
+  performance_metrics <- rbind(performance_metrics, 
+                               data.frame(cutoff = threshold,
+                                          sensitivity = cm$byClass["Sensitivity"],
+                                          specificity = cm$byClass["Specificity"],
+                                          accuracy = cm$overall["Accuracy"],
+                                          precision = cm$byClass["Precision"]))
+}
+
+ggplot(performance_metrics, aes(x = cutoff)) + 
+  geom_line(aes(y = sensitivity, color = "Sensitivity")) +
+  geom_line(aes(y = specificity, color = "Specificity")) +
+  geom_line(aes(y = accuracy, color = "Accuracy")) +
+  labs(title = "Medical Model Optimization", x = "Cutoff", y = "Metric") +
+  theme_minimal() +
+  scale_color_manual(name = "Metrics", values = c("Sensitivity" = "purple", 
+                                                 "Specificity" = "blue", 
+                                                 "Accuracy" = "red"))
+```
+
+Simple Model Optimization
+
+```{r}
+performance_metrics_simple <- data.frame(cutoff = numeric(0), 
+                                         sensitivity = numeric(0), 
+                                         specificity = numeric(0), 
+                                         accuracy = numeric(0),
+                                         precision = numeric(0))
+
+# Loop through each cutoff to calculate metrics for the simple model
+for (threshold in cutoffs) {
+  # Convert predicted probabilities to class labels using the current cutoff
+  predicted_class_simple <- ifelse(predictions_simple > threshold, 1, 0)
+  
+  # Confusion Matrix
+  cm_simple <- confusionMatrix(factor(predicted_class_simple), factor(testData$heart_disease_binary))
+  
+  # Extract performance metrics
+  performance_metrics_simple <- rbind(performance_metrics_simple, 
+                                      data.frame(cutoff = threshold,
+                                                 sensitivity = cm_simple$byClass["Sensitivity"],
+                                                 specificity = cm_simple$byClass["Specificity"],
+                                                 accuracy = cm_simple$overall["Accuracy"],
+                                                 precision = cm_simple$byClass["Precision"]))
+}
+
+# Plot for simple model
+ggplot(performance_metrics_simple, aes(x = cutoff)) + 
+  geom_line(aes(y = sensitivity, color = "Sensitivity")) +
+  geom_line(aes(y = specificity, color = "Specificity")) +
+  geom_line(aes(y = accuracy, color = "Accuracy")) +
+  labs(title = "Simple Model Optimization", x = "Cutoff", y = "Metric") +
+  theme_minimal() +
+  scale_color_manual(name = "Metrics", values = c("Sensitivity" = "purple", 
+                                                 "Specificity" = "blue", 
+                                                 "Accuracy" = "red"))
+
+```
+
+```{r}
+#simple model predictions with new cutoff value:
+predicted_class_45_s <- ifelse(predictions_simple > 0.45, 1, 0)
+confusionMatrix(factor(predicted_class_45_s), factor(testData$heart_disease_binary))
+
+# medical model predictions with new cutoff value:
+predicted_class_45_m <- ifelse(predictions_medical > 0.45, 1, 0)
+confusionMatrix(factor(predicted_class_45_m), factor(testData$heart_disease_binary))
+
+```

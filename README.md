@@ -1,9 +1,5 @@
 # A Logistic Approach to Heart Disease Diagnosis
 
-![R](https://img.shields.io/badge/R-4.3+-blue?logo=r)
-![Quarto](https://img.shields.io/badge/Quarto-1.5+-purple?logo=quarto)
-![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
-
 ## Final Report (PDF)
 
 **[Stat_330_Final_Project_Jenna_and_Ellee.pdf](Stat_330_Final_Project_Jenna_and_Ellee.pdf)**  

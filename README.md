@@ -24,7 +24,7 @@ Variable selection via AIC identified key factors like recovery impairment and s
 The full analysis is written in **Quarto** — a reproducible format with embedded R code, outputs, and narrative.  
 GitHub renders `.qmd` files inline as formatted reports (no raw code visible by default).
 
-### [View Rendered Report → `heart_disease_report.qmd`](heart_disease_report.qmd)
+### [View Rendered Report → `HEART_PROJ_CODE.qmd`](HEART_PROJ_CODE.qmd)
 
 > Includes libraries, data loading/cleaning, EDA plots (violin, jitter, correlation), variable selection, model summaries, assumptions checks, predictions, ROC, and cutoff optimization.
 

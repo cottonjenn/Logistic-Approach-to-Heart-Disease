@@ -2,7 +2,7 @@
 
 ## Final Report (PDF)
 
-**[Stat_330__Final_Project_Jenna_and_Ellee.pdf](Stat_330__Final_Project_Jenna_and_Ellee.pdf)**  
+**[Stat_330___Final_Project_Jenna_and_Ellee.pdf](Stat_330___Final_Project_Jenna_and_Ellee.pdf)**  
 *Click to view the complete 14-page report — abstract, introduction, EDA, models, predictions, conclusions, and appendix.*
 
 > This PDF is the **final, official report** by Jenna Worthen and Ellee Millard (dated December 11, 2024). It details the full analysis, figures, tables, and findings.
